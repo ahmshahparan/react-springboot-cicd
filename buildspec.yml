@@ -1,0 +1,46 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      java: corretto17
+      nodejs: 20
+    commands:
+      - echo "Installing dependencies..."
+      - cd backend && mvn clean install -DskipTests
+      - cd ../frontend && npm install
+  
+  pre_build:
+    commands:
+      - echo "Running tests..."
+      - cd backend && mvn test
+      - echo "Tests completed successfully."
+  
+  build:
+    commands:
+      - echo "Building Spring Boot backend..."
+      - cd backend && mvn clean package -DskipTests
+      - echo "Building React frontend..."
+      - cd ../frontend && npm run build
+      - echo "Build completed successfully."
+  
+  post_build:
+    commands:
+      - echo "Preparing artifacts for CodeDeploy..."
+      - cd ..
+      - mkdir -p deploy_artifacts/backend deploy_artifacts/frontend deploy_artifacts/scripts
+      - cp backend/target/cicd-backend.jar deploy_artifacts/backend/
+      - cp backend/Dockerfile deploy_artifacts/backend/
+      - cp -r frontend/dist deploy_artifacts/frontend/
+      - cp frontend/Dockerfile deploy_artifacts/frontend/
+      - cp frontend/nginx.conf deploy_artifacts/frontend/
+      - cp docker-compose.yml deploy_artifacts/
+      - cp appspec.yml deploy_artifacts/
+      - cp -r scripts/* deploy_artifacts/scripts/
+      - echo "Artifacts prepared successfully."
+
+artifacts:
+  files:
+    - '**/*'
+  base-directory: deploy_artifacts
+  discard-paths: no
