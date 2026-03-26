@@ -1,31 +1,71 @@
 package com.demo.cicd.service;
 
 import com.demo.cicd.model.Item;
+import com.demo.cicd.repository.ItemRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class ItemService {
 
-    public List<Item> getAllItems() {
-        return Arrays.asList(
-            new Item(1L, "AWS CodePipeline", "Fully managed CI/CD service", "active"),
-            new Item(2L, "AWS CodeBuild", "Build and test code in the cloud", "active"),
-            new Item(3L, "AWS CodeDeploy", "Automate code deployments to EC2", "active"),
-            new Item(4L, "Amazon EC2", "Scalable virtual servers in the cloud", "active"),
-            new Item(5L, "Amazon S3", "Object storage for build artifacts", "active"),
-            new Item(6L, "AWS IAM", "Identity and access management", "active"),
-            new Item(7L, "Amazon CloudWatch", "Monitoring and observability", "active"),
-            new Item(8L, "GitHub Integration", "Source control trigger for pipeline", "active")
-        );
+    private final ItemRepository itemRepository;
+
+    @Autowired
+    public ItemService(ItemRepository itemRepository) {
+        this.itemRepository = itemRepository;
     }
 
-    public Item getItemById(Long id) {
-        return getAllItems().stream()
-            .filter(item -> item.getId().equals(id))
-            .findFirst()
-            .orElse(null);
+    // ─── READ ─────────────────────────────────────────────────────────────────
+
+    public List<Item> getAllItems() {
+        return itemRepository.findAll();
+    }
+
+    public Optional<Item> getItemById(Long id) {
+        return itemRepository.findById(id);
+    }
+
+    public List<Item> getItemsByStatus(String status) {
+        return itemRepository.findByStatusOrderByCreatedAtDesc(status);
+    }
+
+    public List<Item> searchItemsByName(String name) {
+        return itemRepository.findByNameContainingIgnoreCaseOrderByCreatedAtDesc(name);
+    }
+
+    // ─── CREATE ───────────────────────────────────────────────────────────────
+
+    public Item createItem(Item item) {
+        return itemRepository.save(item);
+    }
+
+    // ─── UPDATE ───────────────────────────────────────────────────────────────
+
+    public Optional<Item> updateItem(Long id, Item updatedItem) {
+        return itemRepository.findById(id).map(existing -> {
+            existing.setName(updatedItem.getName());
+            existing.setDescription(updatedItem.getDescription());
+            existing.setStatus(updatedItem.getStatus());
+            return itemRepository.save(existing);
+        });
+    }
+
+    // ─── DELETE ───────────────────────────────────────────────────────────────
+
+    public boolean deleteItem(Long id) {
+        if (itemRepository.existsById(id)) {
+            itemRepository.deleteById(id);
+            return true;
+        }
+        return false;
+    }
+
+    // ─── STATS ────────────────────────────────────────────────────────────────
+
+    public long getTotalCount() {
+        return itemRepository.count();
     }
 }

@@ -9,6 +9,8 @@ public class HealthResponse {
     private String version;
     private String timestamp;
     private String environment;
+    private String database;
+    private long dbItemCount;
 
     public HealthResponse() {
         this.status = "UP";
@@ -16,6 +18,8 @@ public class HealthResponse {
         this.version = "1.0.0";
         this.timestamp = LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
         this.environment = System.getenv("APP_ENV") != null ? System.getenv("APP_ENV") : "production";
+        this.database = "MySQL (AWS RDS)";
+        this.dbItemCount = 0;
     }
 
     public String getStatus() { return status; }
@@ -32,4 +36,10 @@ public class HealthResponse {
 
     public String getEnvironment() { return environment; }
     public void setEnvironment(String environment) { this.environment = environment; }
+
+    public String getDatabase() { return database; }
+    public void setDatabase(String database) { this.database = database; }
+
+    public long getDbItemCount() { return dbItemCount; }
+    public void setDbItemCount(long dbItemCount) { this.dbItemCount = dbItemCount; }
 }

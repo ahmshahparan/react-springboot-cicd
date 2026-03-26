@@ -7,18 +7,21 @@ phases:
       nodejs: 20
     commands:
       - echo "Installing dependencies..."
-      - cd $CODEBUILD_SRC_DIR/backend && mvn clean install -DskipTests -B -q
+      # Install backend dependencies (skip tests here, run them in pre_build)
+      - cd $CODEBUILD_SRC_DIR/backend && mvn dependency:resolve -B -q
+      # Install frontend dependencies
       - cd $CODEBUILD_SRC_DIR/frontend && npm install --silent
 
   pre_build:
     commands:
-      - echo "Running backend tests..."
+      - echo "Running backend unit tests with H2 in-memory database (no RDS needed)..."
+      # The test profile uses H2 so tests pass without a real MySQL connection
       - cd $CODEBUILD_SRC_DIR/backend && mvn test -B -q
-      - echo "Tests completed successfully."
+      - echo "All tests passed."
 
   build:
     commands:
-      - echo "Building Spring Boot backend..."
+      - echo "Building Spring Boot backend JAR..."
       - cd $CODEBUILD_SRC_DIR/backend && mvn clean package -DskipTests -B -q
       - echo "Building React frontend..."
       - cd $CODEBUILD_SRC_DIR/frontend && npm run build
@@ -26,18 +29,25 @@ phases:
 
   post_build:
     commands:
-      - echo "Preparing artifacts for CodeDeploy..."
+      - echo "Packaging artifacts for CodeDeploy..."
       - cd $CODEBUILD_SRC_DIR
+      # Create clean artifact directory structure
       - mkdir -p deploy_artifacts/backend deploy_artifacts/frontend deploy_artifacts/scripts
+      # Backend: pre-built JAR + Dockerfile (Dockerfile copies the JAR, no source needed)
       - cp backend/target/cicd-backend.jar deploy_artifacts/backend/
-      - cp backend/Dockerfile deploy_artifacts/backend/
-      - cp -r frontend/dist deploy_artifacts/frontend/
-      - cp frontend/Dockerfile deploy_artifacts/frontend/
-      - cp frontend/nginx.conf deploy_artifacts/frontend/
-      - cp docker-compose.yml deploy_artifacts/
-      - cp appspec.yml deploy_artifacts/
-      - cp -r scripts/. deploy_artifacts/scripts/
-      - echo "Artifacts prepared successfully."
+      - cp backend/Dockerfile              deploy_artifacts/backend/
+      # Frontend: pre-built dist + Dockerfile + Nginx config
+      - cp -r frontend/dist               deploy_artifacts/frontend/
+      - cp frontend/Dockerfile            deploy_artifacts/frontend/
+      - cp frontend/nginx.conf            deploy_artifacts/frontend/
+      # Root files
+      - cp docker-compose.yml             deploy_artifacts/
+      - cp appspec.yml                    deploy_artifacts/
+      # Deployment lifecycle scripts
+      - cp -r scripts/.                   deploy_artifacts/scripts/
+      - chmod +x deploy_artifacts/scripts/*.sh
+      - echo "Artifacts packaged. Contents:"
+      - find deploy_artifacts -type f | sort
 
 artifacts:
   files:

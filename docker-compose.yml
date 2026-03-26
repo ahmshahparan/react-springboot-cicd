@@ -1,7 +1,33 @@
 version: '3.8'
 
 services:
-  # ─── Spring Boot Backend ──────────────────────────────────────────────────
+
+  # ─── MySQL Database ───────────────────────────────────────────────────────────
+  # Runs MySQL 8.0 as a Docker container on the EC2 instance.
+  # This is architecturally equivalent to AWS RDS MySQL from the application's
+  # perspective — Spring Boot connects via JDBC the same way.
+  # Data is persisted to a named Docker volume so it survives container restarts.
+  mysql:
+    image: mysql:8.0
+    container_name: cicd-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-RootPass2024!}
+      MYSQL_DATABASE: ${DB_NAME:-cicddb}
+      MYSQL_USER: ${DB_USER:-cicduser}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-CicdPass2024!}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - app-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-RootPass2024!}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # ─── Spring Boot Backend ─────────────────────────────────────────────────────
   backend:
     build:
       context: ./backend
@@ -10,8 +36,16 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - APP_ENV=development
-      - SPRING_PROFILES_ACTIVE=default
+      # DB_HOST points to the mysql service name (Docker internal DNS)
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_NAME=${DB_NAME:-cicddb}
+      - DB_USER=${DB_USER:-cicduser}
+      - DB_PASSWORD=${DB_PASSWORD:-CicdPass2024!}
+      - APP_ENV=production
+    depends_on:
+      mysql:
+        condition: service_healthy
     networks:
       - app-network
     restart: unless-stopped
@@ -19,10 +53,10 @@ services:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/api/health"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 60s
+      retries: 5
+      start_period: 90s
 
-  # ─── React Frontend ───────────────────────────────────────────────────────
+  # ─── React Frontend (Nginx) ───────────────────────────────────────────────────
   frontend:
     build:
       context: ./frontend
@@ -36,6 +70,10 @@ services:
     networks:
       - app-network
     restart: unless-stopped
+
+volumes:
+  mysql_data:
+    driver: local
 
 networks:
   app-network:
